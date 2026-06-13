@@ -186,12 +186,33 @@ class ProductController extends Controller
 
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'category'=>['required','string','exists:categories,name'], 'name'=>['required','string','max:255'],
             'print_copy'=>['required','integer','min:1'], 'amount'=>['required','numeric','min:0'],
             'front_back_amount'=>['nullable','numeric','min:0'],
+            'gsm_options' => ['nullable', 'array'],
+            'gsm_options.*.label' => ['nullable', 'string', 'max:50'],
+            'gsm_options.*.extra_price' => ['nullable', 'numeric', 'min:0'],
             'pricing_tiers'=>['nullable','array'],
             'is_active'=>['sometimes','boolean'], 'sort_order'=>['nullable','integer','min:0'],
         ]);
+
+        $validated['gsm_options'] = collect($validated['gsm_options'] ?? [])
+            ->map(function ($option) {
+                $label = trim((string) ($option['label'] ?? ''));
+                if ($label === '') {
+                    return null;
+                }
+
+                return [
+                    'label' => $label,
+                    'extra_price' => (float) ($option['extra_price'] ?? 0),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return $validated;
     }
 }

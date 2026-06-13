@@ -6,6 +6,7 @@ use App\Models\B2CCategory;
 use App\Models\B2COrder;
 use App\Models\B2CProduct;
 use App\Models\Customer;
+use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -69,6 +70,16 @@ class B2CAdminController extends Controller
         ]);
 
         $b2cOrder->update(['status' => $data['status']]);
+
+        PortalNotificationService::notifyCustomers([$b2cOrder->customer_id], [
+            'type' => 'order_status',
+            'module' => 'b2c',
+            'title' => 'B2C order status updated',
+            'message' => "{$b2cOrder->order_number} is now marked as {$data['status']}.",
+            'related_model' => B2COrder::class,
+            'related_id' => $b2cOrder->id,
+            'related_order_number' => $b2cOrder->order_number,
+        ]);
 
         return response()->json([
             'message' => 'B2C order status updated successfully.',

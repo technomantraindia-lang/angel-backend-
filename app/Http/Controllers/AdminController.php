@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Models\MonthlyAnalytics;
+use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -154,12 +155,30 @@ class AdminController extends Controller
             $updates['completed_at'] = null;
         }
         $order->update($updates);
+        PortalNotificationService::notifyUsers([$order->dealer_id], [
+            'type' => 'order_status',
+            'module' => 'b2b',
+            'title' => 'B2B order status updated',
+            'message' => "{$order->order_number} is now marked as {$data['status']}.",
+            'related_model' => Order::class,
+            'related_id' => $order->id,
+            'related_order_number' => $order->order_number,
+        ]);
         return response()->json(['message' => 'Order status updated.', 'order' => $order->fresh(['dealer', 'assignedStaff', 'items', 'extraCharges'])]);
     }
 
     public function shareReceipt(Request $request, Order $order): JsonResponse
     {
         $order->update(['receipt_shared' => true]);
+        PortalNotificationService::notifyUsers([$order->dealer_id], [
+            'type' => 'receipt_shared',
+            'module' => 'b2b',
+            'title' => 'Receipt shared for your order',
+            'message' => "Receipt for {$order->order_number} is now available.",
+            'related_model' => Order::class,
+            'related_id' => $order->id,
+            'related_order_number' => $order->order_number,
+        ]);
         return response()->json(['message' => 'Receipt shared with dealer.', 'order' => $order->fresh(['dealer', 'assignedStaff', 'items', 'extraCharges'])]);
     }
 
@@ -186,7 +205,8 @@ class AdminController extends Controller
             'staff' => [
                 'id' => $staff->id,
                 'name' => $staff->name,
-                'email' => $staff->email
+                'email' => $staff->email,
+                'plain_password' => $staff->plain_password,
             ]
         ], 201);
     }

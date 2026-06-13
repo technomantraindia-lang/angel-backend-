@@ -326,13 +326,5 @@
             <p>This is a computer-generated receipt, no signature required.</p>
         </div>
     </div>
-    <script>
-        // Auto trigger browser print dialogue
-        window.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                window.print();
-            }, 500);
-        });
-    </script>
 </body>
 </html>

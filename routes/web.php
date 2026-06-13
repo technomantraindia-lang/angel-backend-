@@ -6,6 +6,7 @@ use App\Http\Controllers\B2CAuthController;
 use App\Http\Controllers\B2COrderController;
 use App\Http\Controllers\B2CPolicyController;
 use App\Http\Controllers\B2CProductController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StaffController;
@@ -34,6 +35,9 @@ Route::prefix('api/b2c')->group(function () {
         Route::post('/profile/reset-password', [B2CAuthController::class, 'resetPassword']);
         Route::get('/my-orders', [B2COrderController::class, 'myOrders']);
         Route::post('/orders', [B2COrderController::class, 'store']);
+        Route::get('/notifications', [NotificationController::class, 'customerIndex']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'customerMarkAllRead']);
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'customerMarkRead']);
     });
 });
 
@@ -48,6 +52,9 @@ Route::prefix('portal/api')->group(function () {
         Route::post('/profile/update', [AuthController::class, 'updateProfile']);
         Route::get('/categories', [ProductController::class, 'categories']);
         Route::get('/download/{item}', [OrderController::class, 'download']);
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
         Route::middleware('approved.dealer')->group(function () {
             Route::get('/products', [ProductController::class, 'index']);
             Route::get('/my-orders', [OrderController::class, 'myOrders']);

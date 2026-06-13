@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\B2COrder;
 use App\Models\B2CProduct;
+use App\Services\PortalNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,7 @@ class B2COrderController extends Controller
         $customer = $request->user('customer');
         abort_unless($customer, 401);
 
-        $this->ensureB2COrderItemColumns(['file_path', 'original_filename', 'gsm', 'gsm_price']);
+        $this->ensureB2COrderItemColumns(['file_path', 'original_filename', 'gsm', 'gsm_price', 'design_serial_number']);
 
         $validated = $this->validateOrderPayload($request);
 
@@ -69,6 +70,7 @@ class B2COrderController extends Controller
                     'gsm_price' => $gsmCharge,
                     'finish' => $finish,
                     'custom_text' => $item['custom_text'] ?? null,
+                    'design_serial_number' => $item['design_serial_number'] ?? null,
                 ];
             }
 
@@ -102,6 +104,7 @@ class B2COrderController extends Controller
                     'gsm_price' => $item['gsm_price'],
                     'finish' => $item['finish'],
                     'custom_text' => $item['custom_text'],
+                    'design_serial_number' => $item['design_serial_number'],
                     'file_path' => $path,
                     'original_filename' => $file?->getClientOriginalName(),
                 ]);
@@ -109,6 +112,16 @@ class B2COrderController extends Controller
 
             return $order->fresh(['customer', 'assignedStaff', 'items']);
         });
+
+        PortalNotificationService::notifyAdminsAndStaff([
+            'type' => 'order_placed',
+            'module' => 'b2c',
+            'title' => 'New B2C order placed',
+            'message' => "{$order->order_number} was placed by {$order->contact_name}.",
+            'related_model' => B2COrder::class,
+            'related_id' => $order->id,
+            'related_order_number' => $order->order_number,
+        ]);
 
         return response()->json([
             'message' => 'B2C order submitted successfully.',
@@ -245,6 +258,7 @@ class B2COrderController extends Controller
             'items.*.gsm' => ['nullable', 'string', 'max:50'],
             'items.*.finish' => ['nullable', 'in:none,foil,textured,wax_seal'],
             'items.*.custom_text' => ['nullable', 'string', 'max:2000'],
+            'items.*.design_serial_number' => ['nullable', 'string', 'max:120'],
         ])->validate();
 
         foreach ($validated['items'] as $index => $unused) {

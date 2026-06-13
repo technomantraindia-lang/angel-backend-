@@ -36,4 +36,9 @@ class Customer extends Authenticatable
     {
         return $this->hasMany(B2COrder::class, 'customer_id');
     }
+
+    public function notifications()
+    {
+        return $this->hasMany(PortalNotification::class);
+    }
 }

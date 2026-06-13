@@ -25,6 +25,7 @@ class B2COrderItem extends Model
         'finish',
         'event_date',
         'custom_text',
+        'design_serial_number',
         'file_path',
         'original_filename',
     ];
