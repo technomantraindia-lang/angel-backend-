@@ -29,49 +29,124 @@ class B2COrderController extends Controller
 
         $validated = $this->validateOrderPayload($request);
 
-        $productIds = collect($validated['items'])->pluck('product_id')->unique()->values();
-        $products = B2CProduct::query()->whereIn('id', $productIds)->where('is_active', true)->get()->keyBy('id');
-
-        if ($products->count() !== $productIds->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'One or more selected products are unavailable right now.',
-            ]);
+        $b2cProductIds = [];
+        $colorPrintProductIds = [];
+        foreach ($validated['items'] as $item) {
+            if (!empty($item['is_color_print'])) {
+                $colorPrintProductIds[] = (int) $item['product_id'];
+            } else {
+                $b2cProductIds[] = (int) $item['product_id'];
+            }
         }
 
-        $order = DB::transaction(function () use ($customer, $validated, $products, $request) {
+        $b2cProducts = B2CProduct::query()->whereIn('id', $b2cProductIds)->where('is_active', true)->get()->keyBy('id');
+        $colorPrintProducts = \App\Models\Product::query()->whereIn('id', $colorPrintProductIds)->where('is_active', true)->where('is_b2c', true)->get()->keyBy('id');
+
+        // Verify all products exist and are available
+        foreach ($validated['items'] as $item) {
+            $pid = (int) $item['product_id'];
+            if (!empty($item['is_color_print'])) {
+                if (!$colorPrintProducts->has($pid)) {
+                    throw ValidationException::withMessages([
+                        'items' => "Color print product ID {$pid} is unavailable.",
+                    ]);
+                }
+            } else {
+                if (!$b2cProducts->has($pid)) {
+                    throw ValidationException::withMessages([
+                        'items' => "Product ID {$pid} is unavailable.",
+                    ]);
+                }
+            }
+        }
+
+        $order = DB::transaction(function () use ($customer, $validated, $b2cProducts, $colorPrintProducts, $request) {
             $subtotal = 0;
             $lineItems = [];
 
             foreach ($validated['items'] as $item) {
-                $product = $products->get((int) $item['product_id']);
-                $printSide = $item['print_side'] ?? 'front';
-                $finish = $item['finish'] ?? 'none';
-                $finishCharge = self::FINISH_SURCHARGES[$finish] ?? 0;
-                $this->assertValidPrintSide($product, $printSide);
-                $this->assertValidQuantity($product, (int) $item['quantity']);
-                $gsmOption = $this->resolveGsmOption($product, $item['gsm'] ?? null);
+                $pid = (int) $item['product_id'];
+                $isColorPrint = !empty($item['is_color_print']);
 
-                $baseUnitPrice = $printSide === 'front_back'
-                    ? (float) ($product->front_back_amount ?? $product->amount)
-                    : (float) $product->amount;
+                if ($isColorPrint) {
+                    $product = $colorPrintProducts->get($pid);
+                    $packs = max(1, (int) ($item['packs'] ?? 1));
+                    $printCopy = max(1, (int) ($item['print_copy'] ?? $product->print_copy));
+                    $printSide = $item['print_side'] ?? 'front';
+                    
+                    $effectiveSide = ($printSide === 'both' || $printSide === 'front_back') ? 'both' : 'front';
+                    $hasBoth = $product->front_back_amount !== null && $product->front_back_amount !== '' && (float) $product->front_back_amount > 0;
+                    $actualSide = ($effectiveSide === 'both' && $hasBoth) ? 'both' : 'front';
 
-                $gsmCharge = (float) ($gsmOption['extra_price'] ?? 0);
-                $unitPrice = $baseUnitPrice + $finishCharge + $gsmCharge;
-                $lineTotal = $unitPrice * (int) $item['quantity'];
+                    // Base Cost per pack = Product Base Price * printCopy
+                    $productPrice = ($actualSide === 'both') ? $product->front_back_amount : $product->amount;
+                    $baseCost = (float) $productPrice * $printCopy;
 
-                $subtotal += $lineTotal;
-                $lineItems[] = [
-                    'product' => $product,
-                    'quantity' => (int) $item['quantity'],
-                    'unit_price' => $unitPrice,
-                    'line_total' => $lineTotal,
-                    'print_side' => $printSide,
-                    'gsm' => $gsmOption['label'] ?? null,
-                    'gsm_price' => $gsmCharge,
-                    'finish' => $finish,
-                    'custom_text' => $item['custom_text'] ?? null,
-                    'design_serial_number' => $item['design_serial_number'] ?? null,
-                ];
+                    $discountPercent = 0.0;
+                    if (!empty($product->pricing_tiers) && is_iterable($product->pricing_tiers)) {
+                        foreach ($product->pricing_tiers as $tier) {
+                            $tierSide = $tier['print_side'] ?? 'front';
+                            if ($tierSide !== $actualSide) continue;
+
+                            $min = (int) ($tier['min'] ?? 0);
+                            $max = isset($tier['max']) && $tier['max'] !== '' && $tier['max'] !== null ? (int) $tier['max'] : null;
+                            if ($printCopy >= $min && ($max === null || $printCopy <= $max)) {
+                                $discountPercent = (float) ($tier['discount'] ?? 0);
+                                break;
+                            }
+                        }
+                    }
+
+                    $unitPrice = round($baseCost * (1 - $discountPercent / 100));
+                    $lineTotal = $unitPrice * $packs;
+                    $subtotal += $lineTotal;
+
+                    $copiesLabel = "Copies: {$printCopy}, Side: " . ($actualSide === 'both' ? 'Double Side' : 'Single Side');
+                    $customText = empty($item['custom_text']) ? $copiesLabel : $item['custom_text'] . " | " . $copiesLabel;
+
+                    $lineItems[] = [
+                        'is_color_print' => true,
+                        'product' => $product,
+                        'quantity' => $packs,
+                        'unit_price' => $unitPrice,
+                        'line_total' => $lineTotal,
+                        'print_side' => $actualSide === 'both' ? 'front_back' : 'front',
+                        'gsm' => null,
+                        'gsm_price' => 0,
+                        'finish' => $item['finish'] ?? 'none',
+                        'custom_text' => $customText,
+                        'design_serial_number' => $item['design_serial_number'] ?? null,
+                    ];
+                } else {
+                    $product = $b2cProducts->get($pid);
+                    $printSide = $item['print_side'] ?? 'front';
+                    $finish = $item['finish'] ?? 'none';
+                    $finishCharge = self::FINISH_SURCHARGES[$finish] ?? 0;
+                    $this->assertValidPrintSide($product, $printSide);
+                    $this->assertValidQuantity($product, (int) $item['quantity']);
+
+                    $baseUnitPrice = $printSide === 'front_back'
+                        ? (float) ($product->front_back_amount ?? $product->amount)
+                        : (float) $product->amount;
+
+                    $unitPrice = $baseUnitPrice + $finishCharge;
+                    $lineTotal = $unitPrice * (int) $item['quantity'];
+                    $subtotal += $lineTotal;
+
+                    $lineItems[] = [
+                        'is_color_print' => false,
+                        'product' => $product,
+                        'quantity' => (int) $item['quantity'],
+                        'unit_price' => $unitPrice,
+                        'line_total' => $lineTotal,
+                        'print_side' => $printSide,
+                        'gsm' => null,
+                        'gsm_price' => 0,
+                        'finish' => $finish,
+                        'custom_text' => $item['custom_text'] ?? null,
+                        'design_serial_number' => $item['design_serial_number'] ?? null,
+                    ];
+                }
             }
 
             $order = B2COrder::create([
@@ -93,7 +168,7 @@ class B2COrderController extends Controller
                 $path = $file ? $file->store('b2c/design-files/' . $order->id, 'public') : null;
 
                 $order->items()->create([
-                    'b2c_product_id' => $item['product']->id,
+                    'b2c_product_id' => $item['is_color_print'] ? null : $item['product']->id,
                     'product_name' => $item['product']->name,
                     'category_name' => $item['product']->category,
                     'quantity' => $item['quantity'],
@@ -116,7 +191,7 @@ class B2COrderController extends Controller
         PortalNotificationService::notifyAdminsAndStaff([
             'type' => 'order_placed',
             'module' => 'b2c',
-            'title' => 'New B2C order placed',
+            'title' => 'New customer order placed',
             'message' => "{$order->order_number} was placed by {$order->contact_name}.",
             'related_model' => B2COrder::class,
             'related_id' => $order->id,
@@ -124,7 +199,7 @@ class B2COrderController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'B2C order submitted successfully.',
+            'message' => 'Customer order submitted successfully.',
             'order' => $order,
         ], 201);
     }
@@ -187,7 +262,7 @@ class B2COrderController extends Controller
         ]);
 
         if ($user->role === 'staff' && $b2cOrder->assigned_staff_id !== null && $b2cOrder->assigned_staff_id !== $user->id) {
-            abort(403, 'You are not assigned to this B2C order.');
+            abort(403, 'You are not assigned to this customer order.');
         }
 
         $data = $request->validate([
@@ -231,7 +306,7 @@ class B2COrderController extends Controller
         $b2cOrder->update($updates);
 
         return response()->json([
-            'message' => 'B2C job status updated successfully.',
+            'message' => 'Customer job status updated successfully.',
             'order' => $b2cOrder->fresh(['customer', 'assignedStaff', 'items']),
         ]);
     }
@@ -252,10 +327,12 @@ class B2COrderController extends Controller
         $validated = validator($payload, [
             'customer_note' => ['nullable', 'string', 'max:3000'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:b2c_products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.print_side' => ['nullable', 'in:front,front_back'],
-            'items.*.gsm' => ['nullable', 'string', 'max:50'],
+            'items.*.product_id' => ['required', 'integer'],
+            'items.*.is_color_print' => ['nullable', 'boolean'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'items.*.packs' => ['nullable', 'integer', 'min:1'],
+            'items.*.print_copy' => ['nullable', 'integer', 'min:1'],
+            'items.*.print_side' => ['nullable', 'string', 'in:front,front_back,both'],
             'items.*.finish' => ['nullable', 'in:none,foil,textured,wax_seal'],
             'items.*.custom_text' => ['nullable', 'string', 'max:2000'],
             'items.*.design_serial_number' => ['nullable', 'string', 'max:120'],
@@ -338,46 +415,25 @@ class B2COrderController extends Controller
 
     private function resolveGsmOption(B2CProduct $product, ?string $gsm): ?array
     {
-        $options = collect($product->gsm_options ?? [])
-            ->map(function ($option) {
-                if (is_string($option)) {
-                    $label = trim($option);
+        return null;
+    }
 
-                    return $label !== ''
-                        ? ['label' => $label, 'extra_price' => 0.0]
-                        : null;
-                }
+    public function receipt(Request $request, B2COrder $b2cOrder)
+    {
+        $customer = $request->user('customer');
+        $user = $request->user();
 
-                if (!is_array($option)) {
-                    return null;
-                }
-
-                $label = trim((string) ($option['label'] ?? ''));
-
-                if ($label === '') {
-                    return null;
-                }
-
-                return [
-                    'label' => $label,
-                    'extra_price' => round((float) ($option['extra_price'] ?? 0), 2),
-                ];
-            })
-            ->filter()
-            ->values();
-
-        if ($options->isEmpty()) {
-            return null;
+        if (!$customer && (!$user || !in_array($user->role, ['admin', 'staff'], true))) {
+            abort(401, 'Unauthenticated');
         }
 
-        $selected = $options->first(fn ($option) => ($option['label'] ?? null) === $gsm);
-
-        if (!$gsm || !$selected) {
-            throw ValidationException::withMessages([
-                'items' => "Please select a valid GSM option for {$product->name}.",
-            ]);
+        if ($customer) {
+            if ($b2cOrder->customer_id !== $customer->id || !$b2cOrder->receipt_shared) {
+                abort(403, 'Unauthorized. This receipt is not shared yet.');
+            }
         }
 
-        return $selected;
+        $b2cOrder->load(['customer', 'items']);
+        return view('b2c_receipt', ['order' => $b2cOrder]);
     }
 }

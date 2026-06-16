@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate(['email'=>'admin@angelprintshop.com'], ['name'=>'Portal Admin','company_name'=>'Angel Print Shop','password'=>Hash::make('Admin@123'),'role'=>'admin','approval_status'=>'approved']);
+        User::updateOrCreate(['email'=>'admin@angelprintshop.com'], ['name'=>'Portal Admin','company_name'=>'Angel Print Shop','phone'=>'8200391418','address'=>'F/4, First Floor, Shyamal Complex, New CG Road, Chandkheda, Ahmedabad, Gujarat','pincode'=>'382424','password'=>Hash::make('Admin@123'),'role'=>'admin','approval_status'=>'approved']);
         User::updateOrCreate(['email'=>'staff@angelprintshop.com'], ['name'=>'Printing Operator','company_name'=>'Angel Print Shop','password'=>Hash::make('Staff@123'),'role'=>'staff','approval_status'=>'approved']);
         $dealer = User::updateOrCreate(['email'=>'dealer@example.com'], ['name'=>'Demo Dealer','company_name'=>'Demo Enterprises','phone'=>'9999999999','address'=>'Vadodara, Gujarat','password'=>Hash::make('Dealer@123'),'role'=>'dealer','approval_status'=>'approved','wallet_balance'=>5000]);
         if (!$dealer->walletTransactions()->exists()) {

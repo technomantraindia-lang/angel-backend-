@@ -35,7 +35,7 @@ class B2CPolicyController extends Controller
         $policy->update($data);
 
         return response()->json([
-            'message' => 'B2C printing policy updated successfully.',
+            'message' => 'Customer printing policy updated successfully.',
             'policy' => $policy->fresh(),
         ]);
     }

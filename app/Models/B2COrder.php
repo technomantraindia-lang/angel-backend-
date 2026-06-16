@@ -16,6 +16,7 @@ class B2COrder extends Model
         'customer_id',
         'assigned_staff_id',
         'staff_status',
+        'receipt_shared',
         'deadline_at',
         'contact_name',
         'contact_email',
@@ -37,6 +38,7 @@ class B2COrder extends Model
             'deadline_at' => 'datetime',
             'completed_at' => 'datetime',
             'picked_up_at' => 'datetime',
+            'receipt_shared' => 'boolean',
         ];
     }
 

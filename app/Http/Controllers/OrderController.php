@@ -108,7 +108,7 @@ class OrderController extends Controller
         PortalNotificationService::notifyAdminsAndStaff([
             'type' => 'order_placed',
             'module' => 'b2b',
-            'title' => 'New B2B order placed',
+            'title' => 'New dealer order placed',
             'message' => "{$result->order_number} was placed by {$request->user()->company_name}.",
             'related_model' => Order::class,
             'related_id' => $result->id,
@@ -162,34 +162,6 @@ class OrderController extends Controller
 
     private function resolveGsmOption(Product $product, ?string $gsm): ?array
     {
-        $options = collect($product->gsm_options ?? [])
-            ->map(function ($option) {
-                if (is_string($option)) {
-                    $label = trim($option);
-                    return $label === '' ? null : ['label' => $label, 'extra_price' => 0];
-                }
-
-                if (!is_array($option)) {
-                    return null;
-                }
-
-                $label = trim((string) ($option['label'] ?? ''));
-                if ($label === '') {
-                    return null;
-                }
-
-                return [
-                    'label' => $label,
-                    'extra_price' => (float) ($option['extra_price'] ?? 0),
-                ];
-            })
-            ->filter()
-            ->values();
-
-        if (!$gsm) {
-            return null;
-        }
-
-        return $options->first(fn ($option) => ($option['label'] ?? null) === $gsm) ?: null;
+        return null;
     }
 }

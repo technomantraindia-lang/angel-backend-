@@ -67,7 +67,7 @@ class B2CProductController extends Controller
 
         if (B2CCategory::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->exists()) {
             throw ValidationException::withMessages([
-                'name' => 'This B2C category already exists.',
+                'name' => 'This customer category already exists.',
             ]);
         }
 
@@ -90,7 +90,7 @@ class B2CProductController extends Controller
 
         $b2cCategory->delete();
 
-        return response()->json(['message' => 'B2C category deleted successfully.']);
+        return response()->json(['message' => 'Customer category deleted successfully.']);
     }
 
     public function store(Request $request): JsonResponse
@@ -137,7 +137,7 @@ class B2CProductController extends Controller
             $b2cProduct->delete();
         });
 
-        return response()->json(['message' => 'B2C product deleted successfully.']);
+        return response()->json(['message' => 'Customer product deleted successfully.']);
     }
 
     private function validateProduct(Request $request, ?B2CProduct $product = null): array
@@ -156,7 +156,8 @@ class B2CProductController extends Controller
             'amount' => ['required', 'numeric', 'min:0'],
             'front_back_amount' => ['nullable', 'numeric', 'min:0'],
             'print_side_mode' => ['required', 'in:front_only,front_back_only,both'],
-            'gsm_options_json' => ['nullable', 'string', 'max:5000'],
+            'warning' => ['nullable', 'string', 'max:1000'],
+            'allow_design_serial' => ['sometimes'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
             'sample_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
@@ -184,8 +185,6 @@ class B2CProductController extends Controller
             ]);
         }
 
-        $gsmOptions = $this->parseGsmOptions($validated['gsm_options_json'] ?? null);
-
         if (in_array($validated['print_side_mode'], ['front_back_only', 'both'], true)
             && (!isset($validated['front_back_amount']) || (float) $validated['front_back_amount'] <= 0)
         ) {
@@ -206,56 +205,12 @@ class B2CProductController extends Controller
                 ? ($validated['front_back_amount'] ?? null)
                 : null,
             'print_side_mode' => $validated['print_side_mode'],
-            'gsm_options' => $gsmOptions,
+            'gsm_options' => [],
+            'warning' => isset($validated['warning']) ? trim($validated['warning']) : null,
+            'allow_design_serial' => filter_var($validated['allow_design_serial'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ];
-    }
-
-    private function parseGsmOptions(?string $gsmOptionsJson): array
-    {
-        if (!$gsmOptionsJson) {
-            return [];
-        }
-
-        $decoded = json_decode($gsmOptionsJson, true);
-
-        if (!is_array($decoded)) {
-            throw ValidationException::withMessages([
-                'gsm_options_json' => 'Please enter valid GSM options.',
-            ]);
-        }
-
-        $normalized = collect($decoded)
-            ->map(function ($option) {
-                if (!is_array($option)) {
-                    return null;
-                }
-
-                $label = trim((string) ($option['label'] ?? ''));
-                $extraPrice = (float) ($option['extra_price'] ?? 0);
-
-                if ($label === '') {
-                    return null;
-                }
-
-                if ($extraPrice < 0) {
-                    throw ValidationException::withMessages([
-                        'gsm_options_json' => 'GSM extra price cannot be negative.',
-                    ]);
-                }
-
-                return [
-                    'label' => $label,
-                    'extra_price' => round($extraPrice, 2),
-                ];
-            })
-            ->filter()
-            ->unique(fn ($option) => strtolower((string) $option['label']))
-            ->values()
-            ->all();
-
-        return $normalized;
     }
 
     private function syncProductMedia(Request $request, B2CProduct $product): void

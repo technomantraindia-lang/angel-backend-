@@ -29,6 +29,8 @@ Route::prefix('api/b2c')->group(function () {
     Route::post('/logout', [B2CAuthController::class, 'logout']);
     Route::get('/products', [B2CProductController::class, 'index']);
     Route::get('/categories', [B2CProductController::class, 'categories']);
+    Route::get('/color-print/products', [ProductController::class, 'b2cIndex']);
+    Route::get('/color-print/categories', [ProductController::class, 'b2cCategories']);
     Route::get('/policy', [B2CPolicyController::class, 'show']);
     Route::middleware('auth:customer')->group(function () {
         Route::post('/profile/update', [B2CAuthController::class, 'updateProfile']);
@@ -80,6 +82,7 @@ Route::prefix('portal/api')->group(function () {
             Route::put('/staff/{staff}', [AdminController::class, 'updateStaff']);
             Route::put('/orders/{order}/assign', [AdminController::class, 'assignStaff']);
             Route::put('/orders/{order}/status', [AdminController::class, 'updateStatus']);
+            Route::delete('/orders/{order}', [AdminController::class, 'destroyOrder']);
             Route::post('/orders/{order}/share-receipt', [AdminController::class, 'shareReceipt']);
             Route::post('/orders/{order}/extra-charge', [AdminController::class, 'addCharge']);
             Route::get('/b2c/dashboard', [B2CAdminController::class, 'dashboard']);
@@ -88,6 +91,8 @@ Route::prefix('portal/api')->group(function () {
             Route::get('/b2c/orders', [B2CAdminController::class, 'orders']);
             Route::put('/b2c/orders/{b2cOrder}/status', [B2CAdminController::class, 'updateOrderStatus']);
             Route::put('/b2c/orders/{b2cOrder}/assign', [B2CAdminController::class, 'assignStaff']);
+            Route::delete('/b2c/orders/{b2cOrder}', [B2CAdminController::class, 'destroyOrder']);
+            Route::post('/b2c/orders/{b2cOrder}/share-receipt', [B2CAdminController::class, 'shareReceipt']);
             Route::get('/b2c/policy', [B2CPolicyController::class, 'adminShow']);
             Route::put('/b2c/policy', [B2CPolicyController::class, 'update']);
             Route::get('/b2c/categories', [B2CProductController::class, 'adminCategories']);
@@ -97,6 +102,15 @@ Route::prefix('portal/api')->group(function () {
             Route::post('/b2c/products', [B2CProductController::class, 'store']);
             Route::post('/b2c/products/{b2cProduct}', [B2CProductController::class, 'update']);
             Route::delete('/b2c/products/{b2cProduct}', [B2CProductController::class, 'destroy']);
+
+            // B2C Custom Color Print admin routes
+            Route::get('/b2c-color-print/categories', [ProductController::class, 'b2cCategories']);
+            Route::post('/b2c-color-print/categories', [ProductController::class, 'storeB2CCategory']);
+            Route::delete('/b2c-color-print/categories/{category}', [ProductController::class, 'destroyB2CCategory']);
+            Route::get('/b2c-color-print/products', [ProductController::class, 'b2cAdminIndex']);
+            Route::post('/b2c-color-print/products', [ProductController::class, 'storeB2CProduct']);
+            Route::put('/b2c-color-print/products/{product}', [ProductController::class, 'updateB2CProduct']);
+            Route::delete('/b2c-color-print/products/{product}', [ProductController::class, 'destroyB2CProduct']);
         });
         Route::middleware('role:admin,staff')->prefix('/staff')->group(function () {
             Route::get('/queue', [StaffController::class, 'queue']);
@@ -108,6 +122,7 @@ Route::prefix('portal/api')->group(function () {
 });
 
 Route::get('/portal/orders/{order}/receipt', [OrderController::class, 'receipt'])->middleware('auth');
+Route::get('/customer/orders/{b2cOrder}/receipt', [B2COrderController::class, 'receipt']);
 
 // React page refresh fallback (keep after portal API routes).
 Route::view('/portal/{any?}', 'app')->where('any', '.*');

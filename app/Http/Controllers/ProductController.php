@@ -143,7 +143,7 @@ class ProductController extends Controller
     {
         abort_unless($product->is_b2c, 422, 'Product is not a B2C product.');
         $product->delete();
-        return response()->json(['message'=>'B2C Product deleted successfully.']);
+        return response()->json(['message'=>'Customer Product deleted successfully.']);
     }
 
     public function b2cCategories(): JsonResponse
@@ -163,7 +163,7 @@ class ProductController extends Controller
         $exists = \App\Models\Category::where('is_b2c', true)->whereRaw('LOWER(name) = ?', [strtolower($name)])->exists();
         if ($exists) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'name' => 'This B2C category name has already been taken.'
+                'name' => 'This Customer category name has already been taken.'
             ]);
         }
 
@@ -177,11 +177,11 @@ class ProductController extends Controller
         $hasProducts = Product::where('is_b2c', true)->where('category', $category->name)->exists();
         if ($hasProducts) {
             return response()->json([
-                'message' => 'Cannot delete B2C category because it contains products.'
+                'message' => 'Cannot delete Customer category because it contains products.'
             ], 422);
         }
         $category->delete();
-        return response()->json(['message' => 'B2C Category deleted successfully.']);
+        return response()->json(['message' => 'Customer Category deleted successfully.']);
     }
 
     private function validated(Request $request): array
@@ -197,21 +197,7 @@ class ProductController extends Controller
             'is_active'=>['sometimes','boolean'], 'sort_order'=>['nullable','integer','min:0'],
         ]);
 
-        $validated['gsm_options'] = collect($validated['gsm_options'] ?? [])
-            ->map(function ($option) {
-                $label = trim((string) ($option['label'] ?? ''));
-                if ($label === '') {
-                    return null;
-                }
-
-                return [
-                    'label' => $label,
-                    'extra_price' => (float) ($option['extra_price'] ?? 0),
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+        $validated['gsm_options'] = [];
 
         return $validated;
     }

@@ -146,24 +146,58 @@ class AdminController extends Controller
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
         $data = $request->validate([
-            'status' => ['required', 'string', 'in:new,working,done'],
+            'status' => ['required', 'string', 'in:new,working,done,cancelled'],
         ]);
-        $updates = ['status' => $data['status']];
-        if ($data['status'] === 'done') {
-            $updates['completed_at'] = now();
-        } else {
-            $updates['completed_at'] = null;
+
+        $oldStatus = $order->status;
+        $newStatus = $data['status'];
+
+        if ($oldStatus === 'cancelled' && $newStatus !== 'cancelled') {
+            throw ValidationException::withMessages(['status' => 'Cannot change status of a cancelled order.']);
         }
-        $order->update($updates);
+
+        DB::transaction(function () use ($request, $order, $newStatus, $oldStatus) {
+            if ($newStatus === 'cancelled' && $oldStatus !== 'cancelled') {
+                $debits = WalletTransaction::where('order_id', $order->id)->where('type', 'debit')->sum('amount');
+                $credits = WalletTransaction::where('order_id', $order->id)->where('type', 'credit')->sum('amount');
+                $refundAmount = (float)$debits - (float)$credits;
+
+                if ($refundAmount > 0) {
+                    $dealer = User::lockForUpdate()->findOrFail($order->dealer_id);
+                    $dealer->wallet_balance = (float)$dealer->wallet_balance + $refundAmount;
+                    $dealer->save();
+
+                    WalletTransaction::create([
+                        'user_id' => $dealer->id,
+                        'order_id' => $order->id,
+                        'type' => 'credit',
+                        'amount' => $refundAmount,
+                        'balance_after' => $dealer->wallet_balance,
+                        'description' => 'Refund for cancelled order ' . $order->order_number,
+                        'created_by' => $request->user()->id
+                    ]);
+                }
+            }
+
+            $updates = ['status' => $newStatus];
+            if ($newStatus === 'done') {
+                $updates['completed_at'] = now();
+            } else {
+                $updates['completed_at'] = null;
+            }
+            $order->update($updates);
+        });
+
         PortalNotificationService::notifyUsers([$order->dealer_id], [
             'type' => 'order_status',
             'module' => 'b2b',
-            'title' => 'B2B order status updated',
-            'message' => "{$order->order_number} is now marked as {$data['status']}.",
+            'title' => 'Dealer order status updated',
+            'message' => "{$order->order_number} is now marked as {$newStatus}.",
             'related_model' => Order::class,
             'related_id' => $order->id,
             'related_order_number' => $order->order_number,
         ]);
+
         return response()->json(['message' => 'Order status updated.', 'order' => $order->fresh(['dealer', 'assignedStaff', 'items', 'extraCharges'])]);
     }
 
@@ -260,7 +294,7 @@ class AdminController extends Controller
     public function destroyB2CCustomer(Customer $customer): JsonResponse
     {
         $customer->delete();
-        return response()->json(['message' => 'B2C customer account deleted successfully.']);
+        return response()->json(['message' => 'Customer account deleted successfully.']);
     }
 
     public function b2cOrders(): JsonResponse
@@ -268,5 +302,21 @@ class AdminController extends Controller
         return response()->json(Order::whereHas('dealer', function ($q) {
             $q->where('role', 'customer');
         })->with(['dealer', 'assignedStaff', 'items', 'extraCharges'])->latest('created_at')->get());
+    }
+
+    public function destroyOrder(Order $order): JsonResponse
+    {
+        $year = $order->created_at->year;
+
+        DB::transaction(function () use ($order) {
+            WalletTransaction::where('order_id', $order->id)->update(['order_id' => null]);
+            ExtraCharge::where('order_id', $order->id)->delete();
+            $order->items()->delete();
+            $order->delete();
+        });
+
+        $this->syncMonthlyAnalytics($year);
+
+        return response()->json(['message' => 'Order deleted successfully.']);
     }
 }

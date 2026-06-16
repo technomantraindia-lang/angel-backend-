@@ -201,7 +201,7 @@
                     <img src="{{ asset('logo.png') }}" alt="Angel Enterprise Logo" style="height: 64px; object-fit: contain;" />
                     <div>
                         <h1 style="margin: 0; color: #0f172a; font-size: 26px; font-weight: 800; letter-spacing: -0.02em;">Angel Enterprise</h1>
-                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Premium B2B Printing & Leaflet Services</p>
+                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Premium Dealer Printing & Leaflet Services</p>
                     </div>
                 </div>
                 <p style="margin: 4px 0; font-size: 12px; color: #475569; line-height: 1.4;">

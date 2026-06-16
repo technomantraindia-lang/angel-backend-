@@ -23,6 +23,8 @@ class B2CProduct extends Model
         'front_back_amount',
         'print_side_mode',
         'gsm_options',
+        'warning',
+        'allow_design_serial',
         'sample_pdf_path',
         'is_active',
         'sort_order',
@@ -42,6 +44,8 @@ class B2CProduct extends Model
             'amount' => 'decimal:2',
             'front_back_amount' => 'decimal:2',
             'gsm_options' => 'array',
+            'warning' => 'string',
+            'allow_design_serial' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];

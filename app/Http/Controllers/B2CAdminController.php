@@ -50,7 +50,7 @@ class B2CAdminController extends Controller
     {
         $customer->delete();
 
-        return response()->json(['message' => 'B2C customer deleted successfully.']);
+        return response()->json(['message' => 'Customer deleted successfully.']);
     }
 
     public function orders(): JsonResponse
@@ -69,12 +69,21 @@ class B2CAdminController extends Controller
             'status' => ['required', Rule::in(['new', 'reviewed', 'quoted', 'confirmed', 'processing', 'completed', 'cancelled'])],
         ]);
 
-        $b2cOrder->update(['status' => $data['status']]);
+        $updates = [
+            'status' => $data['status'],
+            'completed_at' => $data['status'] === 'completed' ? ($b2cOrder->completed_at ?? now()) : null,
+        ];
+
+        if ($data['status'] !== 'completed') {
+            $updates['receipt_shared'] = false;
+        }
+
+        $b2cOrder->update($updates);
 
         PortalNotificationService::notifyCustomers([$b2cOrder->customer_id], [
             'type' => 'order_status',
             'module' => 'b2c',
-            'title' => 'B2C order status updated',
+            'title' => 'Customer order status updated',
             'message' => "{$b2cOrder->order_number} is now marked as {$data['status']}.",
             'related_model' => B2COrder::class,
             'related_id' => $b2cOrder->id,
@@ -82,7 +91,7 @@ class B2CAdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'B2C order status updated successfully.',
+            'message' => 'Customer order status updated successfully.',
             'order' => $b2cOrder->fresh(['customer', 'assignedStaff', 'items']),
         ]);
     }
@@ -110,7 +119,34 @@ class B2CAdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'B2C work assignment updated successfully.',
+            'message' => 'Customer work assignment updated successfully.',
+            'order' => $b2cOrder->fresh(['customer', 'assignedStaff', 'items']),
+        ]);
+    }
+
+    public function shareReceipt(Request $request, B2COrder $b2cOrder): JsonResponse
+    {
+        if ($b2cOrder->status !== 'completed') {
+            abort(422, 'Complete the order before sharing the receipt.');
+        }
+
+        $b2cOrder->update([
+            'receipt_shared' => true,
+            'completed_at' => $b2cOrder->completed_at ?? now(),
+        ]);
+
+        PortalNotificationService::notifyCustomers([$b2cOrder->customer_id], [
+            'type' => 'receipt_shared',
+            'module' => 'b2c',
+            'title' => 'Receipt shared for your order',
+            'message' => "Receipt for {$b2cOrder->order_number} is now available.",
+            'related_model' => B2COrder::class,
+            'related_id' => $b2cOrder->id,
+            'related_order_number' => $b2cOrder->order_number,
+        ]);
+
+        return response()->json([
+            'message' => 'Receipt shared with customer successfully.',
             'order' => $b2cOrder->fresh(['customer', 'assignedStaff', 'items']),
         ]);
     }
@@ -125,5 +161,15 @@ class B2CAdminController extends Controller
                 );
             }
         }
+    }
+
+    public function destroyOrder(B2COrder $b2cOrder): JsonResponse
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($b2cOrder) {
+            $b2cOrder->items()->delete();
+            $b2cOrder->delete();
+        });
+
+        return response()->json(['message' => 'Customer order deleted successfully.']);
     }
 }

