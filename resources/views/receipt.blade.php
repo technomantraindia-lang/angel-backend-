@@ -205,8 +205,8 @@
                     </div>
                 </div>
                 <p style="margin: 4px 0; font-size: 12px; color: #475569; line-height: 1.4;">
-                    FIRST FLOOR, Shyamal Complex,<br>
-                    F/4, New CG Rd, nr. KOTAK BANK,<br>
+                    F/4, FIRST FLOOR, Shyamal Complex,<br>
+                    New CG Rd, nr. KOTAK BANK,<br>
                     Nigam Nagar, Chandkheda, Ahmedabad,<br>
                     Gujarat 382424
                 </p>
@@ -214,7 +214,7 @@
                     <strong>OFFICE NO:</strong> 8200391418<br>
                     <strong>CUSTMER CARE WHTAS APP ONLY:</strong> 9724503723
                 </p>
-                <p style="margin: 4px 0 0 0;">Email: billing@angelprintshop.com | Web: angelprintshop.com</p>
+                <p style="margin: 4px 0 0 0;">Email: print@angelprintshop.com | Web: angelprintshop.com</p>
             </div>
             <div class="invoice-title">
                 <h2>Receipt</h2>
@@ -321,7 +321,7 @@
         </div>
 
         <div style="margin-top: 60px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; color: #64748b; font-size: 12px;">
-            <p>Thank you for your business! For any query regarding this invoice, write to support@angelprintshop.com</p>
+            <p>Thank you for your business! For any query regarding this invoice, write to print@angelprintshop.com</p>
             <p>This is a computer-generated receipt, no signature required.</p>
         </div>
     </div>

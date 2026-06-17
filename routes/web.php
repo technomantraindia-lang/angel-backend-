@@ -20,6 +20,7 @@ Route::view('/my-orders', 'app');
 Route::view('/profile', 'app');
 Route::view('/printing-policy', 'app');
 Route::view('/about-us', 'app');
+Route::view('/contact-us', 'app');
 
 Route::prefix('api/b2c')->group(function () {
     Route::post('/register', [B2CAuthController::class, 'register']);
