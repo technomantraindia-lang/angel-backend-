@@ -10,6 +10,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\FlashMessageController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'app');
@@ -32,6 +33,7 @@ Route::prefix('api/b2c')->group(function () {
     Route::get('/color-print/products', [ProductController::class, 'b2cIndex']);
     Route::get('/color-print/categories', [ProductController::class, 'b2cCategories']);
     Route::get('/policy', [B2CPolicyController::class, 'show']);
+    Route::get('/flash-message', [FlashMessageController::class, 'getCustomerFlash']);
     Route::middleware('auth:customer')->group(function () {
         Route::post('/profile/update', [B2CAuthController::class, 'updateProfile']);
         Route::post('/profile/reset-password', [B2CAuthController::class, 'resetPassword']);
@@ -53,6 +55,7 @@ Route::prefix('portal/api')->group(function () {
         Route::post('/profile/reset-password', [AuthController::class, 'resetPassword']);
         Route::post('/profile/update', [AuthController::class, 'updateProfile']);
         Route::get('/categories', [ProductController::class, 'categories']);
+        Route::get('/flash-message', [FlashMessageController::class, 'getDealerFlash']);
         Route::get('/download/{item}', [OrderController::class, 'download']);
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
@@ -65,6 +68,8 @@ Route::prefix('portal/api')->group(function () {
         });
         Route::middleware('role:admin')->prefix('/admin')->group(function () {
             Route::get('/dashboard', [AdminController::class, 'dashboard']);
+            Route::get('/flash-messages', [FlashMessageController::class, 'getAdminSettings']);
+            Route::post('/flash-messages', [FlashMessageController::class, 'updateAdminSettings']);
             Route::post('/categories', [ProductController::class, 'storeCategory']);
             Route::delete('/categories/{category}', [ProductController::class, 'destroyCategory']);
             Route::get('/dealers', [AdminController::class, 'dealers']);
