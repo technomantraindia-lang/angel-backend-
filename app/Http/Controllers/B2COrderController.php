@@ -379,8 +379,25 @@ class B2COrderController extends Controller
 
     private function generateOrderNumber(): string
     {
+        $year = now()->format('Y');
+        $prefix = "B2C-{$year}-";
+
+        $lastOrder = B2COrder::query()
+            ->where('order_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextSeq = 1;
+        if ($lastOrder) {
+            $parts = explode('-', $lastOrder->order_number);
+            $lastSeq = (int) end($parts);
+            $nextSeq = $lastSeq + 1;
+        }
+
         do {
-            $number = 'B2C-' . now()->format('Ymd') . '-' . str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT);
+            $paddedSeq = str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
+            $number = "{$prefix}{$paddedSeq}";
+            $nextSeq++;
         } while (B2COrder::query()->where('order_number', $number)->exists());
 
         return $number;

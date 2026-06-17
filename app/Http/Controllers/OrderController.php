@@ -87,7 +87,7 @@ class OrderController extends Controller
                 throw ValidationException::withMessages(['wallet'=>'Insufficient wallet balance. Please contact admin to refill wallet.']);
             }
             $order = Order::create([
-                'order_number' => 'APS-'.now()->format('ymd').'-'.strtoupper(Str::random(5)),
+                'order_number' => $this->generateOrderNumber(),
                 'dealer_id' => $dealer->id, 'status'=>'new',
                 'subtotal'=>$subtotal, 'grand_total'=>$subtotal, 'customer_note'=>$request->input('customer_note'),
             ]);
@@ -163,5 +163,31 @@ class OrderController extends Controller
     private function resolveGsmOption(Product $product, ?string $gsm): ?array
     {
         return null;
+    }
+
+    private function generateOrderNumber(): string
+    {
+        $year = now()->format('Y');
+        $prefix = "B2B-{$year}-";
+
+        $lastOrder = Order::query()
+            ->where('order_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextSeq = 1;
+        if ($lastOrder) {
+            $parts = explode('-', $lastOrder->order_number);
+            $lastSeq = (int) end($parts);
+            $nextSeq = $lastSeq + 1;
+        }
+
+        do {
+            $paddedSeq = str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
+            $number = "{$prefix}{$paddedSeq}";
+            $nextSeq++;
+        } while (Order::query()->where('order_number', $number)->exists());
+
+        return $number;
     }
 }

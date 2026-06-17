@@ -206,14 +206,13 @@
                     </div>
                 </div>
                 <p style="margin: 4px 0; font-size: 12px; color: #475569; line-height: 1.4;">
-                    Floor No.: First Floor, Building No./Flat No.: F/4<br>
-                    Name Of Premises/Building: Shyamal Complex, Road/Street: New CG Road<br>
-                    Nearby Landmark: Kotak Mahindra Bank, Locality/Sub Locality: Chandkheda<br>
-                    City/Town/Village: Ahmedabad, District: Ahmedabad, State: Gujarat<br>
-                    PIN Code: 382424
+                    FIRST FLOOR, Shyamal Complex,<br>
+                    F/4, New CG Rd, nr. KOTAK BANK,<br>
+                    Nigam Nagar, Chandkheda, Ahmedabad,<br>
+                    Gujarat 382424
                 </p>
                 <p style="margin: 6px 0; font-size: 12px; color: #475569; line-height: 1.4;">
-                    <strong>OFFICE:</strong> 8200391418<br>
+                    <strong>OFFICE NO:</strong> 8200391418<br>
                     <strong>CUSTMER CARE WHTAS APP ONLY:</strong> 9724503723
                 </p>
                 <p style="margin: 4px 0 0 0;">Email: billing@angelprintshop.com | Web: angelprintshop.com</p>

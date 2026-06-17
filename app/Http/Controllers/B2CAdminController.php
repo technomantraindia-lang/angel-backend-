@@ -74,7 +74,9 @@ class B2CAdminController extends Controller
             'completed_at' => $data['status'] === 'completed' ? ($b2cOrder->completed_at ?? now()) : null,
         ];
 
-        if ($data['status'] !== 'completed') {
+        if ($data['status'] === 'completed') {
+            $updates['receipt_shared'] = true;
+        } else {
             $updates['receipt_shared'] = false;
         }
 
