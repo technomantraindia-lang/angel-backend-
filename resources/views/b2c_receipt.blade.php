@@ -206,10 +206,10 @@
                     </div>
                 </div>
                 <p style="margin: 4px 0; font-size: 12px; color: #475569; line-height: 1.4;">
-                    F/4, FIRST FLOOR, Shyamal Complex,<br>
-                    New CG Rd, nr. KOTAK BANK,<br>
+                    F/4, First Floor, Shyamal Complex,<br>
+                    New CG Road, Near Kotak Bank,<br>
                     Nigam Nagar, Chandkheda, Ahmedabad,<br>
-                    Gujarat 382424
+                    Gujarat – 382424
                 </p>
                 <p style="margin: 6px 0; font-size: 12px; color: #475569; line-height: 1.4;">
                     <strong>OFFICE NO:</strong> 8200391418<br>
