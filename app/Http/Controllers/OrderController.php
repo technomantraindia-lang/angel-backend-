@@ -162,6 +162,26 @@ class OrderController extends Controller
 
     private function resolveGsmOption(Product $product, ?string $gsm): ?array
     {
+        if (empty($gsm) || empty($product->gsm_options) || !is_array($product->gsm_options)) {
+            return null;
+        }
+        foreach ($product->gsm_options as $option) {
+            if (is_string($option)) {
+                $label = trim($option);
+                $extraPrice = 0.0;
+            } elseif (is_array($option)) {
+                $label = trim((string)($option['label'] ?? ''));
+                $extraPrice = (float)($option['extra_price'] ?? 0.0);
+            } else {
+                continue;
+            }
+            if ($label === trim($gsm)) {
+                return [
+                    'label' => $label,
+                    'extra_price' => $extraPrice
+                ];
+            }
+        }
         return null;
     }
 

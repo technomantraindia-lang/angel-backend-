@@ -246,7 +246,6 @@
                 <tr>
                     <th>Product Name & Print Details</th>
                     <th class="right">Print Copies</th>
-                    <th class="right">Unit Price</th>
                     <th class="right">Total</th>
                 </tr>
             </thead>
@@ -268,7 +267,6 @@
                             </div>
                         </td>
                         <td class="right">{{ number_format($item->quantity) }}</td>
-                        <td class="right">₹{{ number_format($item->unit_price, 2) }}</td>
                         <td class="right" style="font-weight: 600;">₹{{ number_format($item->line_total, 2) }}</td>
                     </tr>
                 @endforeach

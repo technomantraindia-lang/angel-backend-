@@ -24,7 +24,7 @@ class AuthController extends Controller
             'gst_number' => ['nullable','string','max:30'],
             'password' => ['required','confirmed', Password::min(8)],
         ]);
-        $user = User::create([...$data, 'role' => 'dealer', 'approval_status' => 'pending', 'wallet_balance' => 0]);
+        $user = User::create([...$data, 'plain_password' => $data['password'], 'role' => 'dealer', 'approval_status' => 'pending', 'wallet_balance' => 0]);
         return response()->json(['message' => 'Registration submitted. Admin approval is required before login.', 'dealer_id' => $user->id], 201);
     }
 
@@ -73,6 +73,7 @@ class AuthController extends Controller
         }
 
         $user->password = Hash::make($data['password']);
+        $user->plain_password = $data['password'];
         $user->save();
 
         return response()->json(['message' => 'Password reset successful.']);
@@ -93,6 +94,7 @@ class AuthController extends Controller
         }
 
         $user->password = Hash::make($data['password']);
+        $user->plain_password = $data['password'];
         $user->save();
 
         return response()->json(['message' => 'Password has been successfully reset. You can now login.']);

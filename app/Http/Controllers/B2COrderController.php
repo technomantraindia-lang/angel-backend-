@@ -122,21 +122,18 @@ class B2COrderController extends Controller
                     $printSide = $item['print_side'] ?? 'front';
                     $finish = $item['finish'] ?? 'none';
                     $finishCharge = self::FINISH_SURCHARGES[$finish] ?? 0;
+                    $quantity = (int) $item['quantity'];
                     $this->assertValidPrintSide($product, $printSide);
-                    $this->assertValidQuantity($product, (int) $item['quantity']);
+                    $pricing = $this->resolveStandardProductPricing($product, $quantity, $printSide);
 
-                    $baseUnitPrice = $printSide === 'front_back'
-                        ? (float) ($product->front_back_amount ?? $product->amount)
-                        : (float) $product->amount;
-
-                    $unitPrice = $baseUnitPrice + $finishCharge;
-                    $lineTotal = $unitPrice * (int) $item['quantity'];
+                    $lineTotal = round($pricing['tier_total'] + ($finishCharge * $quantity), 2);
+                    $unitPrice = round($lineTotal / max(1, $quantity), 2);
                     $subtotal += $lineTotal;
 
                     $lineItems[] = [
                         'is_color_print' => false,
                         'product' => $product,
-                        'quantity' => (int) $item['quantity'],
+                        'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                         'line_total' => $lineTotal,
                         'print_side' => $printSide,
@@ -430,6 +427,58 @@ class B2COrderController extends Controller
         }
     }
 
+    private function resolveStandardProductPricing(B2CProduct $product, int $quantity, string $printSide): array
+    {
+        $pricingTiers = collect($product->pricing_tiers ?? [])
+            ->map(function (array $tier) {
+                $frontBackPrice = $tier['front_back_price'] ?? null;
+
+                return [
+                    'quantity' => max(1, (int) ($tier['quantity'] ?? 0)),
+                    'price' => round((float) ($tier['price'] ?? 0), 2),
+                    'front_back_price' => $frontBackPrice === null || $frontBackPrice === ''
+                        ? null
+                        : round((float) $frontBackPrice, 2),
+                ];
+            })
+            ->filter(fn (array $tier) => $tier['quantity'] > 0)
+            ->values();
+
+        if ($pricingTiers->isNotEmpty()) {
+            $matchedTier = $pricingTiers->firstWhere('quantity', $quantity);
+
+            if (!$matchedTier) {
+                throw ValidationException::withMessages([
+                    'items' => "{$product->name} quantity is not available. Please select one of the listed quantity options.",
+                ]);
+            }
+
+            $tierTotal = $printSide === 'front_back'
+                ? $matchedTier['front_back_price']
+                : $matchedTier['price'];
+
+            if ($printSide === 'front_back' && ($tierTotal === null || $tierTotal <= 0)) {
+                throw ValidationException::withMessages([
+                    'items' => "Front & Back pricing is not available for {$product->name} at {$quantity} quantity.",
+                ]);
+            }
+
+            return [
+                'tier_total' => round((float) $tierTotal, 2),
+            ];
+        }
+
+        $this->assertValidQuantity($product, $quantity);
+
+        $baseUnitPrice = $printSide === 'front_back'
+            ? (float) ($product->front_back_amount ?? $product->amount)
+            : (float) $product->amount;
+
+        return [
+            'tier_total' => round($baseUnitPrice * $quantity, 2),
+        ];
+    }
+
     private function resolveGsmOption(B2CProduct $product, ?string $gsm): ?array
     {
         return null;
@@ -452,5 +501,30 @@ class B2COrderController extends Controller
 
         $b2cOrder->load(['customer', 'items']);
         return view('b2c_receipt', ['order' => $b2cOrder]);
+    }
+
+    public function download(Request $request, \App\Models\B2COrderItem $item)
+    {
+        $user = $request->user();
+        $customer = $request->user('customer');
+        $order = $item->order;
+
+        if ($customer) {
+            if ($order->customer_id !== $customer->id) {
+                abort(403, 'Unauthorized.');
+            }
+        } elseif ($user) {
+            if (!in_array($user->role, ['admin', 'staff'], true)) {
+                abort(403, 'Unauthorized.');
+            }
+        } else {
+            abort(401, 'Unauthenticated');
+        }
+
+        if (empty($item->file_path) || !\Illuminate\Support\Facades\Storage::disk('public')->exists($item->file_path)) {
+            abort(404, 'File not found.');
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->download($item->file_path, $item->original_filename);
     }
 }

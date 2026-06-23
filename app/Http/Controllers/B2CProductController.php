@@ -80,6 +80,33 @@ class B2CProductController extends Controller
         return response()->json($category, 201);
     }
 
+    public function updateCategory(Request $request, B2CCategory $b2cCategory): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $name = trim($data['name']);
+
+        if (strtolower($name) !== strtolower($b2cCategory->name)) {
+            if (B2CCategory::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->exists()) {
+                throw ValidationException::withMessages([
+                    'name' => 'This customer category already exists.',
+                ]);
+            }
+        }
+
+        $b2cCategory->update([
+            'name' => $name,
+            'sort_order' => isset($data['sort_order']) ? (int) $data['sort_order'] : $b2cCategory->sort_order,
+            'is_active' => isset($data['is_active']) ? (bool) $data['is_active'] : $b2cCategory->is_active,
+        ]);
+
+        return response()->json($b2cCategory);
+    }
+
     public function destroyCategory(B2CCategory $b2cCategory): JsonResponse
     {
         if ($b2cCategory->products()->exists()) {
@@ -146,16 +173,27 @@ class B2CProductController extends Controller
             $request->merge(['front_back_amount' => null]);
         }
 
+        if ($request->filled('pricing_tiers_json')) {
+            $decodedPricingTiers = json_decode((string) $request->input('pricing_tiers_json'), true);
+            $request->merge([
+                'pricing_tiers' => is_array($decodedPricingTiers) ? $decodedPricingTiers : null,
+            ]);
+        }
+
         $validated = $request->validate([
             'b2c_category_id' => ['required', 'exists:b2c_categories,id'],
             'name' => ['required', 'string', 'max:255'],
             'short_description' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'print_copy' => ['required', 'integer', 'min:1'],
-            'quantity_step' => ['required', 'integer', 'min:1'],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'print_copy' => ['nullable', 'integer', 'min:1'],
+            'quantity_step' => ['nullable', 'integer', 'min:1'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
             'front_back_amount' => ['nullable', 'numeric', 'min:0'],
             'print_side_mode' => ['required', 'in:front_only,front_back_only,both'],
+            'pricing_tiers' => ['required', 'array', 'min:1'],
+            'pricing_tiers.*.quantity' => ['required', 'integer', 'min:1'],
+            'pricing_tiers.*.price' => ['required', 'numeric', 'min:0'],
+            'pricing_tiers.*.front_back_price' => ['nullable', 'numeric', 'min:0'],
             'warning' => ['nullable', 'string', 'max:1000'],
             'allow_design_serial' => ['sometimes'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
@@ -185,12 +223,56 @@ class B2CProductController extends Controller
             ]);
         }
 
-        if (in_array($validated['print_side_mode'], ['front_back_only', 'both'], true)
-            && (!isset($validated['front_back_amount']) || (float) $validated['front_back_amount'] <= 0)
-        ) {
+        $pricingTiers = collect($validated['pricing_tiers'] ?? [])
+            ->map(function (array $tier) {
+                $frontBackPrice = $tier['front_back_price'] ?? null;
+                $normalizedFrontBackPrice = $frontBackPrice === '' || $frontBackPrice === null
+                    ? null
+                    : round((float) $frontBackPrice, 2);
+
+                return [
+                    'quantity' => (int) $tier['quantity'],
+                    'price' => round((float) $tier['price'], 2),
+                    'front_back_price' => $normalizedFrontBackPrice,
+                ];
+            })
+            ->sortBy('quantity')
+            ->values();
+
+        if ($pricingTiers->isEmpty()) {
             throw ValidationException::withMessages([
-                'front_back_amount' => 'Please enter the Front & Back price when this print-side mode is enabled.',
+                'pricing_tiers' => 'Please add at least one quantity price row.',
             ]);
+        }
+
+        if ($pricingTiers->pluck('quantity')->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'pricing_tiers' => 'Each quantity row must use a unique quantity.',
+            ]);
+        }
+
+        if (in_array($validated['print_side_mode'], ['front_back_only', 'both'], true)) {
+            $missingFrontBackTier = $pricingTiers->first(fn (array $tier) => is_null($tier['front_back_price']) || $tier['front_back_price'] <= 0);
+            if ($missingFrontBackTier) {
+                throw ValidationException::withMessages([
+                    'pricing_tiers' => 'Please enter the Front & Back base price for every quantity row.',
+                ]);
+            }
+        }
+
+        if ($validated['print_side_mode'] === 'front_only') {
+            $pricingTiers = $pricingTiers
+                ->map(fn (array $tier) => [...$tier, 'front_back_price' => null])
+                ->values();
+        }
+
+        $baseTier = $pricingTiers->first();
+        $baseQuantity = max(1, (int) $baseTier['quantity']);
+        $baseAmount = round(((float) $baseTier['price']) / $baseQuantity, 2);
+        $baseFrontBackAmount = null;
+
+        if (in_array($validated['print_side_mode'], ['front_back_only', 'both'], true) && !is_null($baseTier['front_back_price'])) {
+            $baseFrontBackAmount = round(((float) $baseTier['front_back_price']) / $baseQuantity, 2);
         }
 
         return [
@@ -198,14 +280,15 @@ class B2CProductController extends Controller
             'name' => trim($validated['name']),
             'short_description' => isset($validated['short_description']) ? trim((string) $validated['short_description']) : null,
             'description' => $validated['description'] ?? null,
-            'print_copy' => (int) $validated['print_copy'],
-            'quantity_step' => (int) $validated['quantity_step'],
-            'amount' => $validated['amount'],
+            'print_copy' => $baseQuantity,
+            'quantity_step' => 1,
+            'amount' => $baseAmount,
             'front_back_amount' => in_array($validated['print_side_mode'], ['front_back_only', 'both'], true)
-                ? ($validated['front_back_amount'] ?? null)
+                ? $baseFrontBackAmount
                 : null,
             'print_side_mode' => $validated['print_side_mode'],
             'gsm_options' => [],
+            'pricing_tiers' => $pricingTiers->all(),
             'warning' => isset($validated['warning']) ? trim($validated['warning']) : null,
             'allow_design_serial' => filter_var($validated['allow_design_serial'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'sort_order' => (int) ($validated['sort_order'] ?? 0),

@@ -21,6 +21,8 @@ Route::view('/profile', 'app');
 Route::view('/printing-policy', 'app');
 Route::view('/about-us', 'app');
 Route::view('/contact-us', 'app');
+Route::view('/products', 'app');
+Route::view('/product/{any?}', 'app')->where('any', '.*');
 
 Route::prefix('api/b2c')->group(function () {
     Route::post('/register', [B2CAuthController::class, 'register']);
@@ -58,6 +60,7 @@ Route::prefix('portal/api')->group(function () {
         Route::get('/categories', [ProductController::class, 'categories']);
         Route::get('/flash-message', [FlashMessageController::class, 'getDealerFlash']);
         Route::get('/download/{item}', [OrderController::class, 'download']);
+        Route::get('/b2c/download/{item}', [B2COrderController::class, 'download']);
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
@@ -72,6 +75,7 @@ Route::prefix('portal/api')->group(function () {
             Route::get('/flash-messages', [FlashMessageController::class, 'getAdminSettings']);
             Route::post('/flash-messages', [FlashMessageController::class, 'updateAdminSettings']);
             Route::post('/categories', [ProductController::class, 'storeCategory']);
+            Route::put('/categories/{category}', [ProductController::class, 'updateCategory']);
             Route::delete('/categories/{category}', [ProductController::class, 'destroyCategory']);
             Route::get('/dealers', [AdminController::class, 'dealers']);
             Route::get('/hold-dealers', [AdminController::class, 'holdDealers']);
@@ -103,6 +107,7 @@ Route::prefix('portal/api')->group(function () {
             Route::put('/b2c/policy', [B2CPolicyController::class, 'update']);
             Route::get('/b2c/categories', [B2CProductController::class, 'adminCategories']);
             Route::post('/b2c/categories', [B2CProductController::class, 'storeCategory']);
+            Route::put('/b2c/categories/{b2cCategory}', [B2CProductController::class, 'updateCategory']);
             Route::delete('/b2c/categories/{b2cCategory}', [B2CProductController::class, 'destroyCategory']);
             Route::get('/b2c/products', [B2CProductController::class, 'adminIndex']);
             Route::post('/b2c/products', [B2CProductController::class, 'store']);
@@ -112,6 +117,7 @@ Route::prefix('portal/api')->group(function () {
             // B2C Custom Color Print admin routes
             Route::get('/b2c-color-print/categories', [ProductController::class, 'b2cCategories']);
             Route::post('/b2c-color-print/categories', [ProductController::class, 'storeB2CCategory']);
+            Route::put('/b2c-color-print/categories/{category}', [ProductController::class, 'updateB2CCategory']);
             Route::delete('/b2c-color-print/categories/{category}', [ProductController::class, 'destroyB2CCategory']);
             Route::get('/b2c-color-print/products', [ProductController::class, 'b2cAdminIndex']);
             Route::post('/b2c-color-print/products', [ProductController::class, 'storeB2CProduct']);

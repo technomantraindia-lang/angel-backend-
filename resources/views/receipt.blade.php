@@ -243,8 +243,6 @@
                 <tr>
                     <th>Product Name/Gsm & Description</th>
                     <th class="right">Print Copies</th>
-                    <th class="right">Packs (Sets)</th>
-                    <th class="right">Unit Price</th>
                     <th class="right">Total</th>
                 </tr>
             </thead>
@@ -256,8 +254,6 @@
                             <div class="item-meta">Category: {{ $item->category }}</div>
                         </td>
                         <td class="right">{{ number_format($item->print_copy) }}</td>
-                        <td class="right">{{ $item->packs }}</td>
-                        <td class="right">₹{{ number_format($item->unit_price, 2) }}</td>
                         <td class="right" style="font-weight: 600;">₹{{ number_format($item->line_total, 2) }}</td>
                     </tr>
                 @endforeach

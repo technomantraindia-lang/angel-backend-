@@ -91,6 +91,36 @@ class ProductController extends Controller
         return response()->json(['message' => 'Category deleted successfully.']);
     }
 
+    public function updateCategory(Request $request, \App\Models\Category $category): JsonResponse
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:100']
+        ]);
+
+        $newName = trim($request->input('name'));
+        $oldName = $category->name;
+
+        if (strtolower($newName) !== strtolower($oldName)) {
+            $exists = \App\Models\Category::where('is_b2b', true)
+                ->whereRaw('LOWER(name) = ?', [strtolower($newName)])
+                ->exists();
+            if ($exists) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'name' => 'This category name has already been taken (case-insensitive duplicate).'
+                ]);
+            }
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($category, $newName, $oldName) {
+            $category->update(['name' => $newName]);
+            Product::where('is_b2b', true)
+                ->where('category', $oldName)
+                ->update(['category' => $newName]);
+        });
+
+        return response()->json($category);
+    }
+
     public function b2cIndex(): JsonResponse
     {
         return response()->json(Product::query()->where('is_b2c', true)->where('is_active', true)->orderBy('category')->orderBy('sort_order')->orderBy('name')->get());
@@ -182,6 +212,37 @@ class ProductController extends Controller
         }
         $category->delete();
         return response()->json(['message' => 'Customer Category deleted successfully.']);
+    }
+
+    public function updateB2CCategory(Request $request, \App\Models\Category $category): JsonResponse
+    {
+        abort_unless($category->is_b2c, 422, 'Category is not a B2C category.');
+        $request->validate([
+            'name' => ['required', 'string', 'max:100']
+        ]);
+
+        $newName = trim($request->input('name'));
+        $oldName = $category->name;
+
+        if (strtolower($newName) !== strtolower($oldName)) {
+            $exists = \App\Models\Category::where('is_b2c', true)
+                ->whereRaw('LOWER(name) = ?', [strtolower($newName)])
+                ->exists();
+            if ($exists) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'name' => 'This Customer category name has already been taken.'
+                ]);
+            }
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($category, $newName, $oldName) {
+            $category->update(['name' => $newName]);
+            Product::where('is_b2c', true)
+                ->where('category', $oldName)
+                ->update(['category' => $newName]);
+        });
+
+        return response()->json($category);
     }
 
     private function validated(Request $request): array
