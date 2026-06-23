@@ -23,6 +23,7 @@ Route::view('/about-us', 'app');
 Route::view('/contact-us', 'app');
 Route::view('/products', 'app');
 Route::view('/product/{any?}', 'app')->where('any', '.*');
+Route::view('/cart', 'app');
 
 Route::prefix('api/b2c')->group(function () {
     Route::post('/register', [B2CAuthController::class, 'register']);
