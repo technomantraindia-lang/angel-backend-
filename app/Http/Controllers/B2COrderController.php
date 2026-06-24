@@ -70,7 +70,6 @@ class B2COrderController extends Controller
 
                 if ($isColorPrint) {
                     $product = $colorPrintProducts->get($pid);
-                    $packs = max(1, (int) ($item['packs'] ?? 1));
                     $printCopy = max(1, (int) ($item['print_copy'] ?? $product->print_copy));
                     $printSide = $item['print_side'] ?? 'front';
                     
@@ -78,7 +77,7 @@ class B2COrderController extends Controller
                     $hasBoth = $product->front_back_amount !== null && $product->front_back_amount !== '' && (float) $product->front_back_amount > 0;
                     $actualSide = ($effectiveSide === 'both' && $hasBoth) ? 'both' : 'front';
 
-                    // Base Cost per pack = Product Base Price * printCopy
+                    // Total job price is based on the selected copy count for this color-print item.
                     $productPrice = ($actualSide === 'both') ? $product->front_back_amount : $product->amount;
                     $baseCost = (float) $productPrice * $printCopy;
 
@@ -97,8 +96,8 @@ class B2COrderController extends Controller
                         }
                     }
 
-                    $unitPrice = round($baseCost * (1 - $discountPercent / 100));
-                    $lineTotal = $unitPrice * $packs;
+                    $lineTotal = round($baseCost * (1 - $discountPercent / 100), 2);
+                    $unitPrice = round($lineTotal / max(1, $printCopy), 2);
                     $subtotal += $lineTotal;
 
                     $copiesLabel = "Copies: {$printCopy}, Side: " . ($actualSide === 'both' ? 'Double Side' : 'Single Side');
@@ -107,7 +106,7 @@ class B2COrderController extends Controller
                     $lineItems[] = [
                         'is_color_print' => true,
                         'product' => $product,
-                        'quantity' => $packs,
+                        'quantity' => $printCopy,
                         'unit_price' => $unitPrice,
                         'line_total' => $lineTotal,
                         'print_side' => $actualSide === 'both' ? 'front_back' : 'front',
@@ -123,7 +122,9 @@ class B2COrderController extends Controller
                     $finish = $item['finish'] ?? 'none';
                     $finishCharge = self::FINISH_SURCHARGES[$finish] ?? 0;
                     $quantity = (int) $item['quantity'];
+                    $designSerialNumber = isset($item['design_serial_number']) ? trim((string) $item['design_serial_number']) : null;
                     $this->assertValidPrintSide($product, $printSide);
+                    $this->assertRequiredDesignSerial($product, $designSerialNumber);
                     $pricing = $this->resolveStandardProductPricing($product, $quantity, $printSide);
 
                     $lineTotal = round($pricing['tier_total'] + ($finishCharge * $quantity), 2);
@@ -141,7 +142,7 @@ class B2COrderController extends Controller
                         'gsm_price' => 0,
                         'finish' => $finish,
                         'custom_text' => $item['custom_text'] ?? null,
-                        'design_serial_number' => $item['design_serial_number'] ?? null,
+                        'design_serial_number' => $designSerialNumber,
                     ];
                 }
             }
@@ -423,6 +424,19 @@ class B2COrderController extends Controller
         if ($quantity < $minimum || (($quantity - $minimum) % $step) !== 0) {
             throw ValidationException::withMessages([
                 'items' => "{$product->name} quantity must start at {$minimum} and increase by {$step}.",
+            ]);
+        }
+    }
+
+    private function assertRequiredDesignSerial(B2CProduct $product, ?string $designSerialNumber): void
+    {
+        if (!$product->allow_design_serial) {
+            return;
+        }
+
+        if (!filled($designSerialNumber)) {
+            throw ValidationException::withMessages([
+                'items' => "Design serial number is required for {$product->name}.",
             ]);
         }
     }

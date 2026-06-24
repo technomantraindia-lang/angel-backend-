@@ -275,6 +275,16 @@ class B2CProductController extends Controller
             $baseFrontBackAmount = round(((float) $baseTier['front_back_price']) / $baseQuantity, 2);
         }
 
+        $allowDesignSerial = filter_var($validated['allow_design_serial'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $hasExistingSamplePdf = $product && !$request->boolean('remove_sample_pdf') && filled($product->getRawOriginal('sample_pdf_path'));
+        $hasIncomingSamplePdf = $request->hasFile('sample_pdf');
+
+        if ($allowDesignSerial && !$hasExistingSamplePdf && !$hasIncomingSamplePdf) {
+            throw ValidationException::withMessages([
+                'sample_pdf' => 'Please upload a sample PDF before enabling the required design serial number option.',
+            ]);
+        }
+
         return [
             'b2c_category_id' => (int) $validated['b2c_category_id'],
             'name' => trim($validated['name']),
@@ -290,7 +300,7 @@ class B2CProductController extends Controller
             'gsm_options' => [],
             'pricing_tiers' => $pricingTiers->all(),
             'warning' => isset($validated['warning']) ? trim($validated['warning']) : null,
-            'allow_design_serial' => filter_var($validated['allow_design_serial'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'allow_design_serial' => $allowDesignSerial,
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ];
