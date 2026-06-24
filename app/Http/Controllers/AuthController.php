@@ -89,6 +89,10 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
+        if ($user && $user->role === 'dealer') {
+            return response()->json(['message' => 'Password reset is not available for dealer accounts.'], 422);
+        }
+
         if (!$user || !$this->matchesRecoveryPhone($user, $data['phone'])) {
             return response()->json(['message' => 'No account found matching this email and phone number.'], 422);
         }
