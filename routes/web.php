@@ -108,7 +108,7 @@ Route::prefix('portal/api')->group(function () {
             Route::put('/b2c/policy', [B2CPolicyController::class, 'update']);
             Route::get('/b2c/categories', [B2CProductController::class, 'adminCategories']);
             Route::post('/b2c/categories', [B2CProductController::class, 'storeCategory']);
-            Route::put('/b2c/categories/{b2cCategory}', [B2CProductController::class, 'updateCategory']);
+            Route::post('/b2c/categories/{b2cCategory}', [B2CProductController::class, 'updateCategory']);
             Route::delete('/b2c/categories/{b2cCategory}', [B2CProductController::class, 'destroyCategory']);
             Route::get('/b2c/products', [B2CProductController::class, 'adminIndex']);
             Route::post('/b2c/products', [B2CProductController::class, 'store']);

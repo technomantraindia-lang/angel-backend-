@@ -61,6 +61,7 @@ class B2CProductController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
         ]);
 
         $name = trim($data['name']);
@@ -71,10 +72,16 @@ class B2CProductController extends Controller
             ]);
         }
 
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('b2c/categories', 'public');
+        }
+
         $category = B2CCategory::create([
             'name' => $name,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => (bool) ($data['is_active'] ?? true),
+            'image_path' => $imagePath,
         ]);
 
         return response()->json($category, 201);
@@ -86,6 +93,8 @@ class B2CProductController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
+            'remove_image' => ['nullable', 'boolean'],
         ]);
 
         $name = trim($data['name']);
@@ -98,10 +107,27 @@ class B2CProductController extends Controller
             }
         }
 
+        $imagePath = $b2cCategory->image_path;
+
+        if ($request->boolean('remove_image')) {
+            if ($imagePath) {
+                Storage::disk('public')->delete($imagePath);
+            }
+            $imagePath = null;
+        }
+
+        if ($request->hasFile('image')) {
+            if ($b2cCategory->image_path) {
+                Storage::disk('public')->delete($b2cCategory->image_path);
+            }
+            $imagePath = $request->file('image')->store('b2c/categories', 'public');
+        }
+
         $b2cCategory->update([
             'name' => $name,
             'sort_order' => isset($data['sort_order']) ? (int) $data['sort_order'] : $b2cCategory->sort_order,
             'is_active' => isset($data['is_active']) ? (bool) $data['is_active'] : $b2cCategory->is_active,
+            'image_path' => $imagePath,
         ]);
 
         return response()->json($b2cCategory);
@@ -113,6 +139,10 @@ class B2CProductController extends Controller
             return response()->json([
                 'message' => 'Cannot delete a category that still has products.',
             ], 422);
+        }
+
+        if ($b2cCategory->image_path) {
+            Storage::disk('public')->delete($b2cCategory->image_path);
         }
 
         $b2cCategory->delete();
