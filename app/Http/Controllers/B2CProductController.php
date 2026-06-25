@@ -61,7 +61,7 @@ class B2CProductController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp'],
         ]);
 
         $name = trim($data['name']);
@@ -93,7 +93,7 @@ class B2CProductController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
-            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:10240'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp'],
             'remove_image' => ['nullable', 'boolean'],
         ]);
 
@@ -226,6 +226,7 @@ class B2CProductController extends Controller
             'pricing_tiers.*.front_back_price' => ['nullable', 'numeric', 'min:0'],
             'warning' => ['nullable', 'string', 'max:1000'],
             'allow_design_serial' => ['sometimes'],
+            'allow_artwork_upload' => ['sometimes'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
             'sample_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
@@ -306,6 +307,7 @@ class B2CProductController extends Controller
         }
 
         $allowDesignSerial = filter_var($validated['allow_design_serial'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $allowArtworkUpload = filter_var($validated['allow_artwork_upload'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $hasExistingSamplePdf = $product && !$request->boolean('remove_sample_pdf') && filled($product->getRawOriginal('sample_pdf_path'));
         $hasIncomingSamplePdf = $request->hasFile('sample_pdf');
 
@@ -331,6 +333,7 @@ class B2CProductController extends Controller
             'pricing_tiers' => $pricingTiers->all(),
             'warning' => isset($validated['warning']) ? trim($validated['warning']) : null,
             'allow_design_serial' => $allowDesignSerial,
+            'allow_artwork_upload' => $allowArtworkUpload,
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ];

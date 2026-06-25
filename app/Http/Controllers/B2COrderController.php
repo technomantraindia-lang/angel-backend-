@@ -339,7 +339,7 @@ class B2COrderController extends Controller
         foreach ($validated['items'] as $index => $unused) {
             if ($request->hasFile('files.' . $index)) {
                 $request->validate([
-                    'files.' . $index => ['file', 'max:51200', 'extensions:cdr,zip,png,jpg,jpeg'],
+                    'files.' . $index => ['file', 'max:51200', 'extensions:pdf,cdr,zip,png,jpg,jpeg'],
                 ]);
             }
         }

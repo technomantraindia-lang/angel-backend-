@@ -26,6 +26,7 @@ class B2CProduct extends Model
         'pricing_tiers',
         'warning',
         'allow_design_serial',
+        'allow_artwork_upload',
         'sample_pdf_path',
         'is_active',
         'sort_order',
@@ -48,6 +49,7 @@ class B2CProduct extends Model
             'pricing_tiers' => 'array',
             'warning' => 'string',
             'allow_design_serial' => 'boolean',
+            'allow_artwork_upload' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
